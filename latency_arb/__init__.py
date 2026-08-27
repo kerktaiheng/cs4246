@@ -1,0 +1,1 @@
+"""Latency arbitrage strategy package."""
