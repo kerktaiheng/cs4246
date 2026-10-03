@@ -1,5 +1,10 @@
-clickhouse-connect
-polars
-numpy
-gymnasium
-torch
+# Core research, recorded-data preparation, and verification dependencies.
+numpy>=1.26,<3
+gymnasium>=1.0,<2
+stable-baselines3>=2.4,<3
+torch>=2.8,<3
+pandas>=2.2,<4
+pyarrow>=16
+clickhouse-connect>=0.8
+pytest>=8,<10
+matplotlib>=3.8,<4

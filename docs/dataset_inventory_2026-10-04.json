@@ -1,0 +1,462 @@
+{
+  "captured_at_utc": "2026-10-03T16:30:17.300349+00:00",
+  "table": "caerus.order_book_states",
+  "date_timezone": "UTC",
+  "queries": {
+    "schema": "DESCRIBE TABLE caerus.order_book_states",
+    "venue_totals": "SELECT exchange, count() AS rows,\n        toString(min(fromUnixTimestamp64Nano(toInt64(local_ts_ns),'UTC'))) AS first_receive_utc,\n        toString(max(fromUnixTimestamp64Nano(toInt64(local_ts_ns),'UTC'))) AS last_receive_utc,\n        countIf(exchange_ts_ns > local_ts_ns) AS negative_clock_age_rows,\n        min(length(bid_prices)) AS min_bid_depth, max(length(bid_prices)) AS max_bid_depth,\n        min(length(ask_prices)) AS min_ask_depth, max(length(ask_prices)) AS max_ask_depth\n        FROM caerus.order_book_states GROUP BY exchange ORDER BY exchange",
+    "daily_counts": "SELECT toString(toDate(fromUnixTimestamp64Nano(toInt64(local_ts_ns),'UTC'))) AS day,\n        exchange, count() AS rows FROM caerus.order_book_states\n        GROUP BY day,exchange ORDER BY day,exchange"
+  },
+  "schema": [
+    {
+      "name": "exchange",
+      "type": "LowCardinality(String)",
+      "default_type": "",
+      "default_expression": "",
+      "comment": "",
+      "codec_expression": "",
+      "ttl_expression": ""
+    },
+    {
+      "name": "exchange_ts_ns",
+      "type": "UInt64",
+      "default_type": "",
+      "default_expression": "",
+      "comment": "",
+      "codec_expression": "",
+      "ttl_expression": ""
+    },
+    {
+      "name": "local_ts_ns",
+      "type": "UInt64",
+      "default_type": "",
+      "default_expression": "",
+      "comment": "",
+      "codec_expression": "",
+      "ttl_expression": ""
+    },
+    {
+      "name": "bid_prices",
+      "type": "Array(Float64)",
+      "default_type": "",
+      "default_expression": "",
+      "comment": "",
+      "codec_expression": "",
+      "ttl_expression": ""
+    },
+    {
+      "name": "bid_sizes",
+      "type": "Array(Float64)",
+      "default_type": "",
+      "default_expression": "",
+      "comment": "",
+      "codec_expression": "",
+      "ttl_expression": ""
+    },
+    {
+      "name": "ask_prices",
+      "type": "Array(Float64)",
+      "default_type": "",
+      "default_expression": "",
+      "comment": "",
+      "codec_expression": "",
+      "ttl_expression": ""
+    },
+    {
+      "name": "ask_sizes",
+      "type": "Array(Float64)",
+      "default_type": "",
+      "default_expression": "",
+      "comment": "",
+      "codec_expression": "",
+      "ttl_expression": ""
+    }
+  ],
+  "venue_totals": [
+    {
+      "exchange": "binance",
+      "rows": 27464104,
+      "first_receive_utc": "2026-08-27 02:31:57.589071655",
+      "last_receive_utc": "2026-10-03 16:30:13.091387831",
+      "negative_clock_age_rows": 32,
+      "min_bid_depth": 20,
+      "max_bid_depth": 20,
+      "min_ask_depth": 20,
+      "max_ask_depth": 20
+    },
+    {
+      "exchange": "hyperliquid",
+      "rows": 5424620,
+      "first_receive_utc": "2026-08-27 02:31:57.352081490",
+      "last_receive_utc": "2026-10-03 16:30:12.895667401",
+      "negative_clock_age_rows": 6,
+      "min_bid_depth": 5,
+      "max_bid_depth": 5,
+      "min_ask_depth": 5,
+      "max_ask_depth": 5
+    }
+  ],
+  "daily_counts": [
+    {
+      "day": "2026-08-27",
+      "exchange": "binance",
+      "rows": 726133
+    },
+    {
+      "day": "2026-08-27",
+      "exchange": "hyperliquid",
+      "rows": 142601
+    },
+    {
+      "day": "2026-08-28",
+      "exchange": "binance",
+      "rows": 817917
+    },
+    {
+      "day": "2026-08-28",
+      "exchange": "hyperliquid",
+      "rows": 159059
+    },
+    {
+      "day": "2026-08-29",
+      "exchange": "binance",
+      "rows": 800175
+    },
+    {
+      "day": "2026-08-29",
+      "exchange": "hyperliquid",
+      "rows": 158433
+    },
+    {
+      "day": "2026-08-30",
+      "exchange": "binance",
+      "rows": 7867
+    },
+    {
+      "day": "2026-08-30",
+      "exchange": "hyperliquid",
+      "rows": 1553
+    },
+    {
+      "day": "2026-09-02",
+      "exchange": "binance",
+      "rows": 424341
+    },
+    {
+      "day": "2026-09-02",
+      "exchange": "hyperliquid",
+      "rows": 83263
+    },
+    {
+      "day": "2026-09-03",
+      "exchange": "binance",
+      "rows": 826241
+    },
+    {
+      "day": "2026-09-03",
+      "exchange": "hyperliquid",
+      "rows": 159227
+    },
+    {
+      "day": "2026-09-04",
+      "exchange": "binance",
+      "rows": 821814
+    },
+    {
+      "day": "2026-09-04",
+      "exchange": "hyperliquid",
+      "rows": 159155
+    },
+    {
+      "day": "2026-09-05",
+      "exchange": "binance",
+      "rows": 752817
+    },
+    {
+      "day": "2026-09-05",
+      "exchange": "hyperliquid",
+      "rows": 158628
+    },
+    {
+      "day": "2026-09-06",
+      "exchange": "binance",
+      "rows": 770197
+    },
+    {
+      "day": "2026-09-06",
+      "exchange": "hyperliquid",
+      "rows": 159133
+    },
+    {
+      "day": "2026-09-07",
+      "exchange": "binance",
+      "rows": 791648
+    },
+    {
+      "day": "2026-09-07",
+      "exchange": "hyperliquid",
+      "rows": 159020
+    },
+    {
+      "day": "2026-09-08",
+      "exchange": "binance",
+      "rows": 811680
+    },
+    {
+      "day": "2026-09-08",
+      "exchange": "hyperliquid",
+      "rows": 159187
+    },
+    {
+      "day": "2026-09-09",
+      "exchange": "binance",
+      "rows": 812632
+    },
+    {
+      "day": "2026-09-09",
+      "exchange": "hyperliquid",
+      "rows": 159175
+    },
+    {
+      "day": "2026-09-10",
+      "exchange": "binance",
+      "rows": 817709
+    },
+    {
+      "day": "2026-09-10",
+      "exchange": "hyperliquid",
+      "rows": 159205
+    },
+    {
+      "day": "2026-09-11",
+      "exchange": "binance",
+      "rows": 809561
+    },
+    {
+      "day": "2026-09-11",
+      "exchange": "hyperliquid",
+      "rows": 158467
+    },
+    {
+      "day": "2026-09-12",
+      "exchange": "binance",
+      "rows": 745984
+    },
+    {
+      "day": "2026-09-12",
+      "exchange": "hyperliquid",
+      "rows": 158302
+    },
+    {
+      "day": "2026-09-13",
+      "exchange": "binance",
+      "rows": 775796
+    },
+    {
+      "day": "2026-09-13",
+      "exchange": "hyperliquid",
+      "rows": 158277
+    },
+    {
+      "day": "2026-09-14",
+      "exchange": "binance",
+      "rows": 820137
+    },
+    {
+      "day": "2026-09-14",
+      "exchange": "hyperliquid",
+      "rows": 159080
+    },
+    {
+      "day": "2026-09-15",
+      "exchange": "binance",
+      "rows": 821541
+    },
+    {
+      "day": "2026-09-15",
+      "exchange": "hyperliquid",
+      "rows": 158939
+    },
+    {
+      "day": "2026-09-16",
+      "exchange": "binance",
+      "rows": 811349
+    },
+    {
+      "day": "2026-09-16",
+      "exchange": "hyperliquid",
+      "rows": 159068
+    },
+    {
+      "day": "2026-09-17",
+      "exchange": "binance",
+      "rows": 801112
+    },
+    {
+      "day": "2026-09-17",
+      "exchange": "hyperliquid",
+      "rows": 159288
+    },
+    {
+      "day": "2026-09-18",
+      "exchange": "binance",
+      "rows": 813588
+    },
+    {
+      "day": "2026-09-18",
+      "exchange": "hyperliquid",
+      "rows": 159347
+    },
+    {
+      "day": "2026-09-19",
+      "exchange": "binance",
+      "rows": 777563
+    },
+    {
+      "day": "2026-09-19",
+      "exchange": "hyperliquid",
+      "rows": 158746
+    },
+    {
+      "day": "2026-09-20",
+      "exchange": "binance",
+      "rows": 783120
+    },
+    {
+      "day": "2026-09-20",
+      "exchange": "hyperliquid",
+      "rows": 159088
+    },
+    {
+      "day": "2026-09-21",
+      "exchange": "binance",
+      "rows": 824213
+    },
+    {
+      "day": "2026-09-21",
+      "exchange": "hyperliquid",
+      "rows": 159319
+    },
+    {
+      "day": "2026-09-22",
+      "exchange": "binance",
+      "rows": 818672
+    },
+    {
+      "day": "2026-09-22",
+      "exchange": "hyperliquid",
+      "rows": 159255
+    },
+    {
+      "day": "2026-09-23",
+      "exchange": "binance",
+      "rows": 817641
+    },
+    {
+      "day": "2026-09-23",
+      "exchange": "hyperliquid",
+      "rows": 159188
+    },
+    {
+      "day": "2026-09-24",
+      "exchange": "binance",
+      "rows": 832009
+    },
+    {
+      "day": "2026-09-24",
+      "exchange": "hyperliquid",
+      "rows": 159218
+    },
+    {
+      "day": "2026-09-25",
+      "exchange": "binance",
+      "rows": 821526
+    },
+    {
+      "day": "2026-09-25",
+      "exchange": "hyperliquid",
+      "rows": 159140
+    },
+    {
+      "day": "2026-09-26",
+      "exchange": "binance",
+      "rows": 771588
+    },
+    {
+      "day": "2026-09-26",
+      "exchange": "hyperliquid",
+      "rows": 158383
+    },
+    {
+      "day": "2026-09-27",
+      "exchange": "binance",
+      "rows": 785284
+    },
+    {
+      "day": "2026-09-27",
+      "exchange": "hyperliquid",
+      "rows": 158855
+    },
+    {
+      "day": "2026-09-28",
+      "exchange": "binance",
+      "rows": 826673
+    },
+    {
+      "day": "2026-09-28",
+      "exchange": "hyperliquid",
+      "rows": 159315
+    },
+    {
+      "day": "2026-09-29",
+      "exchange": "binance",
+      "rows": 822395
+    },
+    {
+      "day": "2026-09-29",
+      "exchange": "hyperliquid",
+      "rows": 159117
+    },
+    {
+      "day": "2026-09-30",
+      "exchange": "binance",
+      "rows": 816763
+    },
+    {
+      "day": "2026-09-30",
+      "exchange": "hyperliquid",
+      "rows": 159174
+    },
+    {
+      "day": "2026-10-01",
+      "exchange": "binance",
+      "rows": 818254
+    },
+    {
+      "day": "2026-10-01",
+      "exchange": "hyperliquid",
+      "rows": 159250
+    },
+    {
+      "day": "2026-10-02",
+      "exchange": "binance",
+      "rows": 827067
+    },
+    {
+      "day": "2026-10-02",
+      "exchange": "hyperliquid",
+      "rows": 159163
+    },
+    {
+      "day": "2026-10-03",
+      "exchange": "binance",
+      "rows": 541169
+    },
+    {
+      "day": "2026-10-03",
+      "exchange": "hyperliquid",
+      "rows": 109016
+    }
+  ],
+  "row_count": 32888724
+}

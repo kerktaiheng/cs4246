@@ -1,0 +1,9 @@
+{
+  "date_utc": "2026-09-15",
+  "aligned_seconds": 86192,
+  "median_abs_gap_bps": 0.9404615495904952,
+  "p99_abs_gap_bps": 4.361239372024252,
+  "max_abs_gap_bps": 51.683787522208384,
+  "percent_seconds_above_7bps": 0.21811769073695936,
+  "purpose": "Reproduce guide's bucket-last descriptive measurement only; causal RL replay uses receive-time backward asof."
+}
