@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 from typing import Any
 
 import numpy as np
@@ -154,6 +155,63 @@ def _hash_file(path: Path) -> str:
         return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
+def _implementation_fingerprint(source_root: Path | None = None) -> dict[str, Any]:
+    """@brief Fingerprint economic/data/training source independently of report styling.
+
+    @param source_root Optional repository root used for isolated verification.
+    @return Per-file SHA256 hashes and a deterministic aggregate source digest.
+    @details Hash relative filenames and LF-normalized bytes so the same checkout
+    has one identity across platforms. All Python files under env and agent are
+    included; report.py is deliberately excluded because cosmetic reports cannot
+    change model selection or execution economics.
+    """
+    root = source_root or Path(__file__).resolve().parents[1]
+    relative_files = {
+        "common/__init__.py", "common/gym_base.py", "latency_arb/__init__.py",
+        "latency_arb/data/__init__.py", "latency_arb/data/schema.py",
+        "latency_arb/data/generate_episodes.py", "latency_arb/data/recorded.py",
+        "latency_arb/baseline.py", "latency_arb/evaluate.py",
+        "latency_arb/experiment.py",
+    }
+    for package in ("latency_arb/agent", "latency_arb/env"):
+        relative_files.update(
+            path.relative_to(root).as_posix()
+            for path in (root / package).rglob("*.py")
+        )
+    hashes = {
+        relative: hashlib.sha256(
+            (root / relative).read_bytes().replace(b"\r\n", b"\n")
+        ).hexdigest()
+        for relative in sorted(relative_files)
+    }
+    return {
+        "source_sha256": hashlib.sha256(_canonical(hashes)).hexdigest(),
+        "files": hashes,
+    }
+
+
+def _git_commit() -> str | None:
+    """@brief Read optional local commit provenance without affecting compatibility.
+
+    @details Git HEAD is deliberately outside the protocol fingerprint: committing
+    report-only edits may change HEAD while the economic implementation remains
+    identical. Uncommitted core changes are still detected by the source hashes.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parents[1]), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    value = result.stdout.strip()
+    if result.returncode == 0 and len(value) in (40, 64) and all(
+        char in "0123456789abcdef" for char in value
+    ):
+        return value
+    return None
+
+
 def _write_json(path: Path, value: Any) -> None:
     """@brief Atomically replace a complete local JSON stage artifact."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -249,6 +307,7 @@ def run_experiment(
     declared.pop("skip_sensitivity")
     protocol = {
         "version": 1, "manifest": str(manifest), "manifest_sha256": manifest_hash,
+        "implementation": _implementation_fingerprint(),
         "config": declared, "training_environment": asdict(execution),
         "evaluation_environment": asdict(evaluation),
         "initial_candidates": [
@@ -277,8 +336,10 @@ def run_experiment(
             raise ValueError("Nonempty experiment directory lacks a complete experiment.json.")
         _write_json(plan_path, {
             "created_at_utc": _utc_now(), "protocol_sha256": protocol_hash, "protocol": protocol,
+            "git_commit": _git_commit(),
         })
 
+    plan_provenance = _read_json(plan_path)
     stage = "initializing"
 
     def status(state: str, next_stage: str, **extra: Any) -> None:
@@ -514,6 +575,8 @@ def run_experiment(
         summary = {
             "protocol_sha256": protocol_hash, "selection_sha256": selection_hash,
             "completed_at_utc": _utc_now(), "manifest_sha256": manifest_hash,
+            "implementation_source_sha256": protocol["implementation"]["source_sha256"],
+            "git_commit": plan_provenance.get("git_commit"),
             "synthetic": all(bool(entry.get("synthetic", False)) for entry in train_entries),
             "selected_candidate": selected["name"], "selected_model_dir": selected["model_dir"],
             "threshold_bps": selection_payload["entry_threshold_bps"],

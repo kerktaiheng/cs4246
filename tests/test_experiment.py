@@ -243,3 +243,40 @@ def test_completed_selection_cannot_change_on_resume(miniature_experiment, tmp_p
     selection_path.write_text(json.dumps(selection), encoding="utf-8")
     with pytest.raises(ValueError, match="Frozen selection checksum"):
         run_experiment(manifest, copied, settings)
+
+
+def test_changed_implementation_rejects_resume_without_editing_sources(
+    miniature_experiment, monkeypatch
+):
+    """@brief Core source identity participates in completed-experiment compatibility."""
+    manifest, output, settings, _, _ = miniature_experiment
+    original = experiments._implementation_fingerprint()
+    changed = {**original, "source_sha256": "0" * 64}
+    selection_before = (output / "selection.json").read_bytes()
+    monkeypatch.setattr(experiments, "_implementation_fingerprint", lambda: changed)
+    with pytest.raises(ValueError, match="protocol differs"):
+        run_experiment(manifest, output, settings)
+    assert (output / "selection.json").read_bytes() == selection_before
+
+
+def test_source_fingerprint_excludes_reports_and_normalizes_line_endings(tmp_path):
+    """@brief Report-only edits preserve compatibility; economic edits invalidate it.
+
+    @details Copy core files into an isolated tree so the live checkout and active
+    overnight experiment never change while this compatibility rule is tested.
+    """
+    root = Path(experiments.__file__).resolve().parents[1]
+    original = experiments._implementation_fingerprint()
+    for relative in original["files"]:
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        normalized = (root / relative).read_bytes().replace(b"\r\n", b"\n")
+        target.write_bytes(normalized.replace(b"\n", b"\r\n"))
+    assert experiments._implementation_fingerprint(tmp_path) == original
+    (tmp_path / "latency_arb" / "report.py").write_text(
+        "# Cosmetic report-only fixture.\n", encoding="utf-8"
+    )
+    assert experiments._implementation_fingerprint(tmp_path) == original
+    baseline = tmp_path / "latency_arb" / "baseline.py"
+    baseline.write_bytes(baseline.read_bytes() + b"# Changed economic implementation.\n")
+    assert experiments._implementation_fingerprint(tmp_path)["source_sha256"] != original["source_sha256"]

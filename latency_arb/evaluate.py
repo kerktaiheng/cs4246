@@ -85,7 +85,7 @@ def rollout(policy: Any, episode: ReplayEpisode, config: EnvConfig | None = None
     observation, info = env.reset(seed=seed)
     equity = [float(info.get("equity", chosen.initial_cash))]
     decisions, rewards = [], []
-    flat_decisions, entry_requests = 0, 0
+    flat_decisions, entry_requests, abstentions, flat_exposure_decisions = 0, 0, 0, 0
     inventory_index = OBSERVATION_NAMES.index("inventory")
     pending_index = OBSERVATION_NAMES.index("pending_action")
     # @details Follow the environment's termination, including delayed risk exits.
@@ -96,6 +96,10 @@ def rollout(policy: Any, episode: ReplayEpisode, config: EnvConfig | None = None
         flat = observation[inventory_index] == 0 and observation[pending_index] < 0
         flat_decisions += int(flat)
         entry_requests += int(flat and action in (1, 2))
+        # @details HOLD while invested is exposure, whereas EXIT while already flat
+        # is economic abstention. Do not equate action zero with staying out.
+        abstentions += int(flat and action not in (1, 2))
+        flat_exposure_decisions += int(observation[inventory_index] == 0)
         decision = {"decision": len(decisions), "action": action,
                     "inventory_before": float(observation[inventory_index]),
                     "pending_action_before": int(observation[pending_index]),
@@ -126,6 +130,14 @@ def rollout(policy: Any, episode: ReplayEpisode, config: EnvConfig | None = None
         indices = np.arange(len(episode) - 1)
     opportunity_count = int(np.count_nonzero(np.abs(episode.gap_bps[indices]) >= reference_gap_bps))
     profits = [float(trade["net_pnl"]) for trade in trades]
+    # @details Same-timestamp pre/post-fill marks carry zero duration; the post-fill
+    # inventory determines exposure until the following sample. This captures the
+    # first 150 ms spent flat after an entry request rather than rounding to seconds.
+    history_times = np.asarray([row["timestamp_ns"] for row in env.equity_history], dtype=np.int64)
+    durations = np.diff(history_times)
+    prior_inventory = np.asarray([row["inventory"] for row in env.equity_history[:-1]])
+    elapsed_ns = int(durations.sum())
+    flat_ns = int(durations[prior_inventory == 0].sum())
     final_pnl = equity[-1] - chosen.initial_cash
     total_fees = float(info.get("fees_paid", 0.0))
     funding_paid = float(info.get("funding_paid", 0.0))
@@ -149,8 +161,14 @@ def rollout(policy: Any, episode: ReplayEpisode, config: EnvConfig | None = None
         "reference_opportunity_count": opportunity_count,
         "reference_gap_bps": reference_gap_bps,
         "flat_entry_rate": len(trades) / flat_decisions if flat_decisions else 0.0,
-        "abstention_rate": (sum(row["action"] == 0 for row in decisions)
-                            / len(decisions) if decisions else 0.0),
+        "abstention_decision_count": abstentions,
+        "abstention_rate": abstentions / flat_decisions if flat_decisions else None,
+        "hold_action_rate": (sum(row["action"] == 0 for row in decisions)
+                             / len(decisions) if decisions else 0.0),
+        "flat_decision_rate": flat_exposure_decisions / len(decisions) if decisions else 1.0,
+        "flat_exposure_rate": flat_ns / elapsed_ns if elapsed_ns else None,
+        "flat_duration_ms": flat_ns / 1_000_000,
+        "exposure_duration_ms": elapsed_ns / 1_000_000,
         "rejection_count": int(info.get("rejection_count", 0)),
         "cancellation_count": int(info.get("cancellation_count", 0)),
         "scaled_reward_sum": float(sum(rewards)),
@@ -205,8 +223,18 @@ def aggregate_results(results: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "flat_entry_rate": len(profits) / flat_count if flat_count else 0.0,
         "decision_count": decision_count, "flat_decision_count": flat_count,
         "entry_request_count": sum(item["entry_request_count"] for item in metrics),
-        "abstention_rate": (sum(item["abstention_rate"] * item["decision_count"]
+        "abstention_decision_count": sum(item["abstention_decision_count"] for item in metrics),
+        "abstention_rate": (sum(item["abstention_decision_count"] for item in metrics)
+                             / flat_count if flat_count else None),
+        "hold_action_rate": (sum(item["hold_action_rate"] * item["decision_count"]
                                for item in metrics) / decision_count if decision_count else 0.0),
+        "flat_decision_rate": (sum(item["flat_decision_rate"] * item["decision_count"]
+                               for item in metrics) / decision_count if decision_count else 1.0),
+        "flat_exposure_rate": (sum(item["flat_duration_ms"] for item in metrics)
+                              / sum(item["exposure_duration_ms"] for item in metrics)
+                              if sum(item["exposure_duration_ms"] for item in metrics) else None),
+        "flat_duration_ms": sum(item["flat_duration_ms"] for item in metrics),
+        "exposure_duration_ms": sum(item["exposure_duration_ms"] for item in metrics),
         "fees_paid": sum(item["fees_paid"] for item in metrics),
         "funding_paid": sum(item["funding_paid"] for item in metrics),
         "rejection_count": sum(item["rejection_count"] for item in metrics),

@@ -295,3 +295,34 @@ def test_reference_selectivity_can_exceed_one_for_below_threshold_trades():
     assert result["metrics"]["trade_selectivity"] == pytest.approx(2)
     assert result["metrics"]["flat_entry_rate"] == pytest.approx(1)
     assert aggregate_results([result])["trade_selectivity"] == pytest.approx(2)
+
+
+
+def test_always_exit_while_flat_is_abstention_not_hold_action():
+    """@brief Economic inactivity includes EXIT on a flat account, without mislabeling HOLD."""
+    class ExitPolicy:
+        """@brief Always request the harmless exit of an already-flat portfolio."""
+
+        def predict(self, observation, deterministic=True):
+            """@brief Return EXIT independently of current book features."""
+            return 3, None
+
+    result = rollout(ExitPolicy(), episode())
+    metrics = result["metrics"]
+    assert metrics["abstention_rate"] == 1.0
+    assert metrics["hold_action_rate"] == 0.0
+    assert metrics["flat_exposure_rate"] == 1.0
+    assert metrics["trade_count"] == 0
+    aggregate = aggregate_results([result, result])
+    assert aggregate["abstention_rate"] == 1.0
+    assert aggregate["hold_action_rate"] == 0.0
+
+
+
+def test_exposure_is_time_weighted_across_delayed_entry():
+    """@brief A first fill at200ms in a2s fixture leaves exactly10percent flat time."""
+    config = EnvConfig(latency_ms=150, decision_interval_ms=1000)
+    result = rollout(ThresholdPolicy(), episode(), config)
+    assert result["metrics"]["flat_exposure_rate"] == pytest.approx(0.1)
+    assert result["metrics"]["flat_decision_rate"] == pytest.approx(0.5)
+    assert result["metrics"]["exposure_duration_ms"] == 2000
