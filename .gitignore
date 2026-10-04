@@ -221,3 +221,6 @@ __marimo__/
 # Generated market data, checkpoints, and experiment outputs
 /data/
 /runs/
+
+# Local report rendering and visual verification scratch files
+/tmp/

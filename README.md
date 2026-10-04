@@ -43,9 +43,21 @@ python -m latency_arb.evaluate \
 
 ## Recorded data
 
-The verified clean range is **3 September–2 October 2026 UTC**, containing
-**28,917,283 raw book rows**. The source has 20 Binance levels and **five**
-Hyperliquid levels. Funding settlement rates are absent from the recorded table.
+Export and preparation are complete for **3 September–2 October 2026 UTC**:
+**28,917,283 raw book rows**, reduced to **8,245 complete five-minute windows**
+out of 8,640 (**95.43% coverage**). These contain 2,473,500 scheduled decision
+snapshots and 7,420,500 replay rows. The fixed split is 22 training days
+(5,984 windows), four validation days (1,121), and four test days (1,140).
+
+The source has 20 Binance levels and **five** Hyperliquid levels. Funding
+settlement rates are absent, so recorded experiments explicitly assume zero
+funding. Rejecting entire windows with stale or missing quotes creates a
+quality-filtered subset; results do not describe performance during excluded
+periods or uninterrupted deployment.
+
+At the 4 October 2026, 10:04 a.m. Singapore checkpoint, the baseline stage had
+completed and PPO seed 7 was training. Completed real-data PPO and held-out
+results were not yet available. See the run's status.json for its latest stage.
 
 The recorded-data module exports one venue and UTC day per query, caches Parquet
 locally, and prepares causal replay archives. It accepts an explicitly authorized
@@ -77,27 +89,47 @@ are rejected by default; an explicit receive-age fallback is available for data
 diagnostics. The recorded-month path instead excludes affected fixed windows and
 never clips negative ages into a plausible measurement.
 
-## Train and evaluate
+## Train, evaluate, and report
+
+Run the complete protocol with three seeds, one million requested decisions per
+seed, validation selection, and the frozen held-out comparison:
 
 ~~~bash
-python -m latency_arb.agent.train \
-  --manifest data/recorded-30d/manifest.json --output runs/ppo-seed7 \
-  --steps 1000000 --seed 7 --n-steps 4096 --batch-size 256 \
-  --gamma 0.999 --decision-interval-ms 1000
-python -m latency_arb.evaluate \
-  --manifest data/recorded-30d/manifest.json --model runs/ppo-seed7 \
-  --output runs/validation --decision-interval-ms 1000 \
-  --select-thresholds 1,2,4,7,10,20,100
+python -m latency_arb.experiment \
+  --manifest data/recorded-30d/manifest.json \
+  --output runs/recorded-ppo-2026-10-04 \
+  --steps 1000000 --seeds 7,17,27 \
+  --n-steps 4096 --batch-size 256 --epochs 5 \
+  --decision-interval-ms 1000 --evaluate-test
+python -m latency_arb.report \
+  --run-dir runs/recorded-ppo-2026-10-04 \
+  --manifest data/recorded-30d/manifest.json
 ~~~
 
-Evaluation defaults to validation. Use --split test only after fixing the
-experiment protocol. Policies share the same execution assumptions, including
-150 ms delay, 3.5 bps taker fees per side, depth VWAP, and adverse slippage.
+Use **one writer per experiment output directory**. Re-running the same compatible
+protocol reuses verified completed stages. An incomplete model/checkpoint
+directory is preserved and cannot be resumed as a completed stage; use a new
+output directory for a fresh run. Do not start a second writer while the current
+experiment is running.
+
+The experiment selects thresholds and PPO candidates on validation before opening
+the final test comparison. Policies share execution assumptions: 150 ms delay,
+3.5 bps taker fees per side, depth VWAP, and adverse slippage. The protocol also
+compares frozen policies under the declared fee, delay, and spread stresses.
 
 PPO saves weights, frozen normalization, provenance hashes, settings, and
 per-episode trade/P&L logs. Model archives should only be loaded from trusted local
 runs. Evaluation writes comparison metrics, every decision, fills, round trips,
-equity paths, and optional fee/delay/spread sensitivity.
+equity paths, and cost sensitivity.
+
+PDF generation uses optional ReportLab. Saved report data and charts remain
+available when that package is absent. After the report data and PNG charts have
+been generated, a separate Python runtime with ReportLab can render only the PDF:
+
+~~~bash
+python -m latency_arb.report \
+  --run-dir runs/recorded-ppo-2026-10-04 --pdf-only
+~~~
 
 ## Layout
 
@@ -110,6 +142,8 @@ equity paths, and optional fee/delay/spread sensitivity.
 | latency_arb/baseline.py | Fixed-threshold and always-flat controls |
 | latency_arb/agent/ | Lazy archive sampling, PPO training, frozen inference |
 | latency_arb/evaluate.py | Full-episode comparisons and cost sensitivity |
+| latency_arb/experiment.py | Compatible-stage resume, seed selection, and frozen test protocol |
+| latency_arb/report.py | Saved result summaries, charts, and optional PDF |
 | tests/ | Causality, arithmetic, risk, data integrity, and actual PPO save/load checks |
 
 Generated data and run artifacts stay under ignored root-level data/ and runs/.

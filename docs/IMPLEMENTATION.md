@@ -1,4 +1,4 @@
-# Implementation and overnight experiment handoff
+# Implementation and experiment handoff
 
 Updated 4 October 2026, Singapore time. Branch: **codex/proposal-offline-rl**.
 
@@ -6,24 +6,40 @@ Updated 4 October 2026, Singapore time. Branch: **codex/proposal-offline-rl**.
 
 The original placeholder data generator, simulator, trainer, and evaluator have
 been replaced. Synthetic PPO training and frozen-policy evaluation have run.
-The recorded 30-day export and preparation are in progress; **real-data PPO
-results are not yet available**. This status is a handoff checkpoint, not a claim
-that the experiment has finished.
+**The recorded 30-day export and preparation are complete.** At the latest
+inspected experiment checkpoint, 4 October 2026 at 10:04 a.m. Singapore time,
+the baseline stage had completed and the first candidate, PPO seed 7, was
+training. **Completed real-data PPO and held-out results are not yet available.**
+The live stage is recorded in runs/recorded-ppo-2026-10-04/status.json.
 
 The current plan is three independent PPO seeds (7, 17, 27), one million policy
 decisions per seed, validation-only threshold and checkpoint selection, then
 one frozen final comparison on the held-out four days. A predeclared higher
 entropy retry is allowed if every initial candidate executes no validation trades.
-The experiment status and exact configuration will be saved under
+The experiment status and exact configuration are saved under
 runs/recorded-ppo-2026-10-04/.
 
-A one-time 8:00 a.m. Singapore follow-up is scheduled in this chat.
+The intended 8:00 a.m. Singapore report was missed after an overnight host
+interruption. At 9:57 a.m., recovery found that the original tunnel on local
+port 8123 had exited with six days of export still outstanding. A dedicated
+recovery tunnel on port 18123 completed the remaining export by 9:59 a.m.;
+the experiment started at 10:00 a.m., and baselines completed at 10:04 a.m.
+These are recorded recovery milestones, not a claim that overnight training or
+the planned morning report finished on time.
+
+The existing follow-up now checks the current run every 15 minutes and notifies
+only on completion or failure. On successful completion it generates and verifies
+the final report PDF at output/pdf/ppo-research-report.pdf, then pauses itself.
+This follow-up does not authorize additional training, source changes, or commits.
 
 ## Verified data
 
-The existing SSH tunnel on local port 8123 reaches the collector's ClickHouse
-instance. Its credentials are used in memory and never written into the repository,
-logs, experiment metadata, or a query URL.
+The collector was queried through a local SSH tunnel; recovery used dedicated
+port 18123 after the original port-8123 tunnel exited. Credentials were used in
+memory and were never written into the repository, logs, experiment metadata,
+or a query URL. The dedicated recovery tunnel was closed after all 60 day/venue
+exports completed. Training and evaluation now use the completed local cache and
+do not require a database connection.
 
 The 4 October 00:30 Singapore inventory query found **32,888,724 rows**:
 27,464,104 Binance and 5,424,620 Hyperliquid. The collector remains active, so later
@@ -33,11 +49,15 @@ counts naturally increase. Its first receive timestamp is 27 August 2026
 The predeclared clean range, **3 September through 2 October UTC**, contains
 **28,917,283 raw rows**: 24,146,574 Binance and 4,770,709 Hyperliquid.
 
-| Split | UTC dates | Days |
-|---|---|---:|
-| Train | 3-24 September | 22 |
-| Validation | 25-28 September | 4 |
-| Test | 29 September-2 October | 4 |
+| Split | UTC dates | Days | Retained windows | Decision snapshots |
+|---|---|---:|---:|---:|
+| Train | 3-24 September | 22 | 5,984 | 1,795,200 |
+| Validation | 25-28 September | 4 | 1,121 | 336,300 |
+| Test | 29 September-2 October | 4 | 1,140 | 342,000 |
+
+All 30 calendar dates are present, with disjoint chronological split boundaries.
+The finalized manifest is data/recorded-30d/manifest.json. Its quality report
+and per-day diagnostics are saved beside it.
 
 The 30 August outage, absent 31 August and 1 September, partial 2 September, and
 current incomplete capture day are excluded. Full inventory queries and per-day
@@ -79,9 +99,23 @@ window fails quality checks, the entire window is rejected. This avoids giving t
 policy advance knowledge of an outage by turning an unexpected gap into a known
 terminal time. Retained windows end at their predeclared final execution sample.
 
-On 3 September, the first prepared day retained **273 of 288 windows (94.79%)**,
-or 81,900 scheduled decision seconds. Full-month retention will be in the final
-quality report. Rejected periods remain excluded from all policies equally.
+The full month retained **8,245 of 8,640 fixed windows (95.42824%)** and rejected
+395: 352 training, 31 validation, and 12 test windows. Retained coverage is
+**2,473,500 scheduled decision seconds (687.08 hours)** and **7,420,500 replay
+rows**. Every retained window contains 300 scheduled decisions and 900 replay
+rows, starts on its fixed UTC boundary, and ends at the predetermined sample
+299.3 seconds later.
+
+No invalid source books or negative source-clock ages were found in the selected
+30 days. The wider inventory contained 38 negative-age rows outside that range.
+Within the selected range, Binance had nine receive gaps above two seconds
+(longest 31.676 seconds), and Hyperliquid had 504 (longest 173.016 seconds).
+The window exclusions preserve those outages rather than interpolating over them.
+
+Every policy uses the same retained windows. However, excluding complete windows
+after checking their data quality creates a **quality-filtered subset** and can
+bias results toward periods with better capture conditions. The findings do not
+establish performance during the excluded periods or uninterrupted deployment.
 
 The generic JSONL preparation command also splits at gaps, but its variable,
 quality-selected terminal boundaries are a research approximation. The recorded
@@ -169,11 +203,26 @@ no-lookahead prefixes, timestamp precision, stale/bad data, chronological splits
 hash/path integrity, bounded caches, real short PPO fits, seed reproducibility,
 and saved-model/normalization equivalence.
 
-The latest completed combined run had **91 passing tests** before additional
-report/orchestration and evaluator regression tests were added. A final complete
-count will be recorded after integration.
+The complete integrated suite passed **123 tests** on 4 October 2026 at
+approximately 10:13 a.m. Singapore time, with two Gymnasium warnings, in
+11.31 seconds.
 
-Reproduction starts in README.md. Generated raw data, archives, model checkpoints,
-and detailed logs live in root-level data/ and runs/ and are excluded from Git.
-The proposal and pre-existing data guide are preserved. No orders are sent to an
-exchange, and the capture service and existing SSH tunnel are left running.
+An independent read-only dataset audit verified all **8,245 episode hashes**
+and **60 raw-cache hashes**, unique archive paths, fixed window lengths, date
+continuity, and split separation. Six boundary episodes, the first and last in
+each split, were independently compared with raw source records: their prices,
+depth, and quote ages matched the latest record received at or before each exact
+grid timestamp. This audit checked data integrity and causality; it did not
+evaluate or tune policy performance on the held-out period.
+
+Reproduction starts in README.md with the complete experiment and report commands.
+Use one writer per experiment output directory. Compatible completed stages
+resume after verification; incomplete model/checkpoint directories are preserved
+and require a new output directory for a fresh run. PDF rendering is optional
+through ReportLab; --pdf-only can run in a separate runtime against existing
+report data and PNG charts.
+
+Generated raw data, archives, model checkpoints, and detailed logs live in
+root-level data/ and runs/ and are excluded from Git. The proposal and pre-existing
+data guide are preserved. No orders are sent to an exchange, and the capture
+service is not modified.
