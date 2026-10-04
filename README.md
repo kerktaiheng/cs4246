@@ -127,7 +127,7 @@ available when that package is absent. After the report data and PNG charts have
 been generated, a separate Python runtime with ReportLab can render only the PDF:
 
 ~~~bash
-python -m latency_arb.report \
+python latency_arb/report.py \
   --run-dir runs/recorded-ppo-2026-10-04 --pdf-only
 ~~~
 
