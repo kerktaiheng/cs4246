@@ -148,3 +148,62 @@ python latency_arb/report.py \
 
 Generated data and run artifacts stay under ignored root-level data/ and runs/.
 There is no live-order submission path.
+
+## Opportunity PPO follow-up
+
+The original four-action run abstained on held-out data. The separate opportunity
+study trains a binary entry selector: skip, or enter in the current gap direction.
+An unchanged execution simulator handles the full trade, a 0.5 bps convergence
+exit, the 30-second holding limit, costs, and delayed fills.
+
+~~~bash
+.venv/bin/python -u -m latency_arb.opportunity_experiment \
+  --manifest data/recorded-30d/manifest.json \
+  --fresh-manifest data/recorded-fresh-2026-10-03/manifest.json \
+  --output runs/opportunity-ppo-2026-10-04 \
+  --steps 65536 --warm-epochs 50 --seeds 7,17,27
+~~~
+
+Use a new, empty output directory. This runner preserves partial artifacts on
+failure and does not restart or overwrite an existing study.
+
+The study uses **4.5 bps per side** (9 bps round trip), 150 ms execution delay,
+0.1 bps extra adverse slippage per fill, and 0.001 BTC position size. The 6 bps
+candidate screen defines when the model can consider an entry; it is not a
+claim that a 6 bps price gap pays these costs. Training labels and portfolio
+rewards charge the complete actual modeled trade costs.
+
+Training covers 3–24 September. Supervised actor initialization uses every causal
+training candidate and its net fixed-exit outcome, including losses and rejected
+future fills. Those trial outcomes can overlap and must never be summed as
+portfolio returns. Genuine PPO then learns from continuous, nonoverlapping replay
+with unchanged marked-equity rewards, undiscounted opportunity transitions, and
+fixed positive reward scaling. Feature normalization is fitted on training data
+only and stays frozen.
+
+Both supervised-only and PPO-finetuned checkpoints are compared on 25–28
+September, alongside fixed thresholds and cash. Validation chooses maximum net
+dollars, with fewer trades breaking ties. A supervised-only winner is explicitly
+identified as such; it does not demonstrate an improvement from PPO.
+
+The previous 29 September–2 October test was already examined and is excluded
+from this study. **3 October is a new, later test day**, prepared independently:
+939,328 raw rows, 286/288 accepted fixed windows, and 85,800 one-second decisions.
+The exact selected model is frozen before this test is opened. If no learned
+validation candidate earns positive net dollars with actual trades, the fresh
+test remains unused. One positive fresh day would be provisional evidence only.
+
+Source is split into opportunity.py (causal features and binary replay),
+agent/opportunity_train.py (training-only targets and genuine PPO),
+opportunity_evaluate.py (full-episode economic comparison), and
+opportunity_experiment.py (protocol, selection, and protected test access).
+Generated outputs include protocol.json, event target provenance, separate
+checkpoints, training trade logs, validation comparisons, selection.json,
+summary.json, and status.json under the requested run directory.
+
+The recorded replay still assumes zero funding because rates are unavailable.
+Public sampled books do not model private fills, market impact, margin, or
+movements between samples. Quality exclusions and fixed five-minute window
+resets remain in force. Reused validation and multiple candidate selection can
+overstate performance; the always-flat and threshold controls remain essential.
+
