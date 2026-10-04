@@ -207,3 +207,52 @@ movements between samples. Quality exclusions and fixed five-minute window
 resets remain in force. Reused validation and multiple candidate selection can
 overstate performance; the always-flat and threshold controls remain essential.
 
+
+## Research outcome log: failed PPO attempts
+
+**Attempt 1: FAILED to learn profitable trading.** The original four-action
+PPO experiment completed operationally, but all three seeds and the higher-entropy
+retry made zero completed validation trades. The selected policy also made zero
+trades and earned $0 on the untouched 29 September–2 October test. This is
+abstention, not a successful trading strategy. At 7 bps round-trip fees, the
+separate 10 bps threshold control earned $1.188287 across 16 held-out trades.
+That profit belongs to the rule-based control and must never be credited to PPO.
+
+The original models, configuration, training logs, validation/test ledgers,
+summary, and report remain preserved in runs/recorded-ppo-2026-10-04.
+Its research_outcome.json explicitly records the research failure. The original
+status.json still says completed because the computation completed; it does not
+classify strategy quality.
+
+**Attempt 2: FAILED to learn profitable trading.** The opportunity-level redesign
+used causal entry features, binary skip/trade actions, fixed exits, supervised
+initialization from net trade outcomes, and genuine PPO fine-tuning. Costs were
+9 bps round trip plus spread and slippage. On 25–28 September validation:
+
+| Candidate | Net USD | Completed trades |
+|---|---:|---:|
+| Seed 7, supervised initialization | 0.000000 | 0 |
+| Seed 7, PPO fine-tuned | 0.000000 | 0 |
+| Seed 17, supervised initialization | -0.107772 | 4 |
+| Seed 17, PPO fine-tuned | 0.000000 | 0 |
+| Seed 27, supervised initialization | -0.021333 | 4 |
+| Seed 27, PPO fine-tuned | 0.000000 | 0 |
+
+No learned candidate beat cash, so the protected 3 October test was not opened.
+Artifacts and research_outcome.json remain in runs/opportunity-ppo-2026-10-04.
+The saved report is runs/opportunity-ppo-2026-10-04/report/report.md.
+
+The training audit found 317,232 candidate rows, with 99.57% concentrated on
+18–23 September when Hyperliquid was persistently more expensive than Binance.
+These correlated, overlapping examples are not 317,232 independent latency
+opportunities. The persistent gap's cause is not proven by these fields.
+Historical rows lack an explicit instrument symbol, and funding rates are
+unavailable. Present quote age and price validity checks passed.
+
+The next comparison directly estimates expected net trade dollars from the same
+training-only outcomes. It is a supervised regression model, not another PPO
+success claim. Its primary evaluation must use the user's stated 7 bps
+round-trip fee, with 9 bps as a frozen-policy stress comparison. Every attempted
+configuration and failure remains part of the research record. Software tests
+do not establish profitability, and a positive validation or single fresh-day
+result cannot establish a durable edge.

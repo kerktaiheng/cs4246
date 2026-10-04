@@ -224,3 +224,6 @@ __marimo__/
 
 # Local report rendering and visual verification scratch files
 /tmp/
+
+# Isolated runtime for expected-payoff comparison models
+/.venv-value/
