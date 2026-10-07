@@ -256,3 +256,25 @@ round-trip fee, with 9 bps as a frozen-policy stress comparison. Every attempted
 configuration and failure remains part of the research record. Software tests
 do not establish profitability, and a positive validation or single fresh-day
 result cannot establish a durable edge.
+
+
+## Version 2: basis-adjusted lead-lag agent
+
+The first two attempts measured the opportunity as the raw Binance-Hyperliquid gap.
+On training days that gap is dominated by a slow basis (a persistent price offset) that
+does not converge, so abstaining was the correct response to that observation. Version 2
+subtracts a causal 60-second moving average of the gap, treats the problem as a
+semi-MDP with fee-conditioned entry and learned exits, and compares PPO, Double DQN,
+fitted-Q iteration and a contextual-bandit ablation against tuned rules under the same
+simulator.
+
+On the previously examined 29 September-2 October test days, with 450 ms fills, PPO
+earned 76.91 USD at 0.5 bps per side and 37.91 USD at 1 bps, trading 5,056 and 3,813
+times. It beat the version 1 rule, Double DQN, fitted-Q and the bandit at those fees,
+tied a tuned hand-written rule at 0.5 bps and beat it at 1 bps. When fills are priced
+at Hyperliquid's own book clock, only the 0.5 bps fee level stays profitable. These are
+not confirmatory results, and they are not evidence of a deployable edge.
+
+Details, protocol history and commands are in [docs/V2_LEADLAG.md](docs/V2_LEADLAG.md),
+how to resume is in [RESUME_V2.md](RESUME_V2.md), and the report is
+output/pdf/final_report_v2.pdf.
