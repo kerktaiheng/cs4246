@@ -236,7 +236,7 @@ def collect_report_data(run_dir, manifest_path=None):
             with path.open("rb") as handle:
                 digest = hashlib.file_digest(handle, "sha256").hexdigest()
             sources.append({"path": str(path), "sha256": digest})
-    return {"report_version": 1, "title": "Learning When Not to Trade", "subtitle": "Cross-venue latency arbitrage after execution costs",
+    return {"report_version": 1, "title": "Reinforcement Learning for Cross-Venue Latency Arbitrage", "subtitle": "Cross-venue latency arbitrage after execution costs",
             "generated_at_singapore": datetime.now(timezone(timedelta(hours=8))).isoformat(timespec="seconds"),
             "evidence_kind": label, "synthetic": synthetic, "test_available": bool(testing), "executive": executive,
             "data_table": _table(["Measure", "Observed value"], coverage),

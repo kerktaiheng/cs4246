@@ -1,13 +1,68 @@
-# Caerus offline reinforcement-learning research
+# Reinforcement learning for cross-venue latency arbitrage
 
-Cost-aware replay and PPO for **Learning When Not to Trade**, the proposal in
-[docs/proposal.tex](docs/proposal.tex). This branch replaces the original model
-placeholders with a checked offline research pipeline.
+Offline reinforcement learning for BTC perpetual futures traded on Binance and
+Hyperliquid (HL). Binance tends to move first and HL follows a few hundred
+milliseconds later. The agent learns, from 30 days of recorded order books, when to
+take a position on HL in the direction of that move and when to close it, with
+fees, spread, slippage and execution delay charged in a replay simulator. Project
+proposal: [docs/proposal.tex](docs/proposal.tex).
 
-Start with [the implementation and experiment handoff](docs/IMPLEMENTATION.md).
-The pre-existing [data access guide](docs/DATA_AND_TRAINING.md) remains useful for
-the collector connection and historical coverage; its placeholder-code status
-predates this implementation.
+## Results
+
+The version 2 agent was trained on 3-24 September 2026, selected on 25-28 September,
+and evaluated on 29 September-2 October. All reported numbers come from the replay
+simulator: orders fill 450 ms after the decision at the recorded HL depth, each trade
+is 0.001 BTC (about USD 77), and the taker fee is charged on every fill.
+
+PPO agent, four test days:
+
+| Fee per side | Net P&L (USD) | Trades | Win rate | Profitable days | Max drawdown (USD) |
+|---|---:|---:|---:|---:|---:|
+| 0.5 bps | +76.91 | 5,056 | 72% | 4 / 4 | 0.17 |
+| 1.0 bps | +37.91 | 3,813 | 60% | 4 / 4 | 0.34 |
+| 2.0 bps | +2.21 | 628 | 44% | 3 / 4 | 0.53 |
+| 3.5 bps | +0.05 | 45 | 44% | 2 / 4 | 0.27 |
+
+Comparison at the same fees (net USD on the same test days):
+
+| Fee per side | PPO | Double DQN | Fitted-Q iteration | Best tuned rule | Version 1 threshold rule |
+|---|---:|---:|---:|---:|---:|
+| 0.5 bps | **76.91** | 54.61 | 55.37 | 76.77 | 23.92 |
+| 1.0 bps | **37.91** | 25.29 | 20.33 | 34.80 | 3.78 |
+| 2.0 bps | 2.21 | **3.17** | 0.80 | 1.94 | 0.67 |
+
+- At 0.5 and 1 bps per side the agent is profitable on every test day with
+  sub-dollar drawdowns. In paired window-by-window comparisons, PPO beats Double DQN,
+  fitted-Q iteration and the version 1 rule at both fees, and beats the best tuned
+  rule at 1 bps (+3.12 USD, 90% interval +0.80 to +5.34).
+- The same network adjusts to the fee it is given, trading about 5,000 times at
+  0.5 bps and 45 times at 3.5 bps.
+- With faster execution (150 ms) PPO earns +107.82 USD at 0.5 bps, +66.07 at 1 bps,
+  +13.51 at 2 bps and +1.71 at 3.5 bps. At 2 bps it beats the best tuned rule by
+  +4.45 USD (90% interval +2.33 to +6.92).
+- What made this work: the raw price gap between the venues is dominated by a slow
+  basis (a persistent offset) that never converges. Subtracting a 60-second moving
+  average of the gap isolates the part that does, and learning when to exit carries
+  most of the remaining value.
+
+Scope: these are simulation results on recorded public books, not live trading. The
+test days were also used by earlier experiments in this project, so a run on later
+days (`latency_arb/v2/confirm.py`) is the next check. If fills are instead priced at
+HL's own book clock, the 0.5 bps result remains positive (PPO +27.05 USD) and the
+higher fee levels do not.
+
+## Reports and documentation
+
+- Final report, version 2 (formal model, algorithm comparison, results):
+  [output/pdf/final_report_v2.pdf](output/pdf/final_report_v2.pdf)
+- Final report, version 1 (the first two PPO designs):
+  [output/pdf/final_report_v1.pdf](output/pdf/final_report_v1.pdf)
+- Version 2 design, protocol history and commands: [docs/V2_LEADLAG.md](docs/V2_LEADLAG.md)
+- Resuming runs and confirming on new days: [RESUME_V2.md](RESUME_V2.md)
+- Pipeline implementation notes: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+- Data access guide: [docs/DATA_AND_TRAINING.md](docs/DATA_AND_TRAINING.md)
+
+There is no live-order submission path.
 
 ## Install
 
@@ -54,10 +109,6 @@ settlement rates are absent, so recorded experiments explicitly assume zero
 funding. Rejecting entire windows with stale or missing quotes creates a
 quality-filtered subset; results do not describe performance during excluded
 periods or uninterrupted deployment.
-
-At the 4 October 2026, 10:04 a.m. Singapore checkpoint, the baseline stage had
-completed and PPO seed 7 was training. Completed real-data PPO and held-out
-results were not yet available. See the run's status.json for its latest stage.
 
 The recorded-data module exports one venue and UTC day per query, caches Parquet
 locally, and prepares causal replay archives. It accepts an explicitly authorized
@@ -149,12 +200,29 @@ python latency_arb/report.py \
 Generated data and run artifacts stay under ignored root-level data/ and runs/.
 There is no live-order submission path.
 
-## Opportunity PPO follow-up
+## Project history
 
-The original four-action run abstained on held-out data. The separate opportunity
-study trains a binary entry selector: skip, or enter in the current gap direction.
-An unchanged execution simulator handles the full trade, a 0.5 bps convergence
-exit, the 30-second holding limit, costs, and delayed fills.
+1. **Four-action PPO** (`runs/recorded-ppo-2026-10-04`): hold, long, short and exit
+   every second at 3.5 bps per side. All seeds converged to holding flat, so the
+   policy made no trades. A fixed 10 bps threshold rule in the same simulator earned
+   +1.19 USD over 16 test trades.
+2. **Opportunity-level PPO** (`runs/opportunity-ppo-2026-10-04`): skip or enter at
+   screened gaps of at least 6 bps, with a supervised warm start and 4.5 bps fees.
+   It also converged to near-zero trading on validation.
+3. **Expected-value selector** (`runs/opportunity-value-2026-10-04`): a
+   gradient-boosting model of net trade value. It made one trade on 3 October,
+   the same trade as the threshold rule.
+4. **Version 2** (`latency_arb/v2/`, `runs/v2-*`): analysing those results showed
+   that the raw gap is mostly a slow basis that does not converge, so with that
+   input the best policy really was to stay flat. Version 2 adds a causal basis
+   estimate, formulates the problem as a semi-MDP with fee-conditioned entry and
+   learned exits, and compares PPO, Double DQN, fitted-Q iteration and a
+   contextual-bandit ablation against tuned rules (results above).
+
+Each run directory keeps its configuration, models, logs and evaluation files. The
+attempt 1 and 2 commands are below.
+
+### Attempt 2 commands
 
 ~~~bash
 .venv/bin/python -u -m latency_arb.opportunity_experiment \
@@ -164,117 +232,6 @@ exit, the 30-second holding limit, costs, and delayed fills.
   --steps 65536 --warm-epochs 50 --seeds 7,17,27
 ~~~
 
-Use a new, empty output directory. This runner preserves partial artifacts on
-failure and does not restart or overwrite an existing study.
+### Version 2 commands
 
-The study uses **4.5 bps per side** (9 bps round trip), 150 ms execution delay,
-0.1 bps extra adverse slippage per fill, and 0.001 BTC position size. The 6 bps
-candidate screen defines when the model can consider an entry; it is not a
-claim that a 6 bps price gap pays these costs. Training labels and portfolio
-rewards charge the complete actual modeled trade costs.
-
-Training covers 3–24 September. Supervised actor initialization uses every causal
-training candidate and its net fixed-exit outcome, including losses and rejected
-future fills. Those trial outcomes can overlap and must never be summed as
-portfolio returns. Genuine PPO then learns from continuous, nonoverlapping replay
-with unchanged marked-equity rewards, undiscounted opportunity transitions, and
-fixed positive reward scaling. Feature normalization is fitted on training data
-only and stays frozen.
-
-Both supervised-only and PPO-finetuned checkpoints are compared on 25–28
-September, alongside fixed thresholds and cash. Validation chooses maximum net
-dollars, with fewer trades breaking ties. A supervised-only winner is explicitly
-identified as such; it does not demonstrate an improvement from PPO.
-
-The previous 29 September–2 October test was already examined and is excluded
-from this study. **3 October is a new, later test day**, prepared independently:
-939,328 raw rows, 286/288 accepted fixed windows, and 85,800 one-second decisions.
-The exact selected model is frozen before this test is opened. If no learned
-validation candidate earns positive net dollars with actual trades, the fresh
-test remains unused. One positive fresh day would be provisional evidence only.
-
-Source is split into opportunity.py (causal features and binary replay),
-agent/opportunity_train.py (training-only targets and genuine PPO),
-opportunity_evaluate.py (full-episode economic comparison), and
-opportunity_experiment.py (protocol, selection, and protected test access).
-Generated outputs include protocol.json, event target provenance, separate
-checkpoints, training trade logs, validation comparisons, selection.json,
-summary.json, and status.json under the requested run directory.
-
-The recorded replay still assumes zero funding because rates are unavailable.
-Public sampled books do not model private fills, market impact, margin, or
-movements between samples. Quality exclusions and fixed five-minute window
-resets remain in force. Reused validation and multiple candidate selection can
-overstate performance; the always-flat and threshold controls remain essential.
-
-
-## Research outcome log: failed PPO attempts
-
-**Attempt 1: FAILED to learn profitable trading.** The original four-action
-PPO experiment completed operationally, but all three seeds and the higher-entropy
-retry made zero completed validation trades. The selected policy also made zero
-trades and earned $0 on the untouched 29 September–2 October test. This is
-abstention, not a successful trading strategy. At 7 bps round-trip fees, the
-separate 10 bps threshold control earned $1.188287 across 16 held-out trades.
-That profit belongs to the rule-based control and must never be credited to PPO.
-
-The original models, configuration, training logs, validation/test ledgers,
-summary, and report remain preserved in runs/recorded-ppo-2026-10-04.
-Its research_outcome.json explicitly records the research failure. The original
-status.json still says completed because the computation completed; it does not
-classify strategy quality.
-
-**Attempt 2: FAILED to learn profitable trading.** The opportunity-level redesign
-used causal entry features, binary skip/trade actions, fixed exits, supervised
-initialization from net trade outcomes, and genuine PPO fine-tuning. Costs were
-9 bps round trip plus spread and slippage. On 25–28 September validation:
-
-| Candidate | Net USD | Completed trades |
-|---|---:|---:|
-| Seed 7, supervised initialization | 0.000000 | 0 |
-| Seed 7, PPO fine-tuned | 0.000000 | 0 |
-| Seed 17, supervised initialization | -0.107772 | 4 |
-| Seed 17, PPO fine-tuned | 0.000000 | 0 |
-| Seed 27, supervised initialization | -0.021333 | 4 |
-| Seed 27, PPO fine-tuned | 0.000000 | 0 |
-
-No learned candidate beat cash, so the protected 3 October test was not opened.
-Artifacts and research_outcome.json remain in runs/opportunity-ppo-2026-10-04.
-The saved report is runs/opportunity-ppo-2026-10-04/report/report.md.
-
-The training audit found 317,232 candidate rows, with 99.57% concentrated on
-18–23 September when Hyperliquid was persistently more expensive than Binance.
-These correlated, overlapping examples are not 317,232 independent latency
-opportunities. The persistent gap's cause is not proven by these fields.
-Historical rows lack an explicit instrument symbol, and funding rates are
-unavailable. Present quote age and price validity checks passed.
-
-The next comparison directly estimates expected net trade dollars from the same
-training-only outcomes. It is a supervised regression model, not another PPO
-success claim. Its primary evaluation must use the user's stated 7 bps
-round-trip fee, with 9 bps as a frozen-policy stress comparison. Every attempted
-configuration and failure remains part of the research record. Software tests
-do not establish profitability, and a positive validation or single fresh-day
-result cannot establish a durable edge.
-
-
-## Version 2: basis-adjusted lead-lag agent
-
-The first two attempts measured the opportunity as the raw Binance-Hyperliquid gap.
-On training days that gap is dominated by a slow basis (a persistent price offset) that
-does not converge, so abstaining was the correct response to that observation. Version 2
-subtracts a causal 60-second moving average of the gap, treats the problem as a
-semi-MDP with fee-conditioned entry and learned exits, and compares PPO, Double DQN,
-fitted-Q iteration and a contextual-bandit ablation against tuned rules under the same
-simulator.
-
-On the previously examined 29 September-2 October test days, with 450 ms fills, PPO
-earned 76.91 USD at 0.5 bps per side and 37.91 USD at 1 bps, trading 5,056 and 3,813
-times. It beat the version 1 rule, Double DQN, fitted-Q and the bandit at those fees,
-tied a tuned hand-written rule at 0.5 bps and beat it at 1 bps. When fills are priced
-at Hyperliquid's own book clock, only the 0.5 bps fee level stays profitable. These are
-not confirmatory results, and they are not evidence of a deployable edge.
-
-Details, protocol history and commands are in [docs/V2_LEADLAG.md](docs/V2_LEADLAG.md),
-how to resume is in [RESUME_V2.md](RESUME_V2.md), and the report is
-output/pdf/final_report_v2.pdf.
+See [docs/V2_LEADLAG.md](docs/V2_LEADLAG.md#commands).
