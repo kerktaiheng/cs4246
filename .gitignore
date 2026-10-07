@@ -227,3 +227,9 @@ __marimo__/
 
 # Isolated runtime for expected-payoff comparison models
 /.venv-value/
+
+# LaTeX build artifacts
+docs/report_v*/main.aux
+docs/report_v*/main.log
+docs/report_v*/main.out
+docs/report_v*/missfont.log
