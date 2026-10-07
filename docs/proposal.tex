@@ -1,0 +1,164 @@
+% CS4246/5446 AY2627 S1 -- Project Proposal
+% Body is constrained to ONE page (single-spaced, single-column, >=10pt, 1in margins).
+% Title page and references are excluded from that limit per the project guidelines.
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
+\usepackage[T1]{fontenc}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+% Tight headings so the body fits one page without shrinking the font.
+\titleformat{\section}{\normalfont\bfseries}{}{0pt}{}
+\titlespacing{\section}{0pt}{3pt plus 1pt minus 1pt}{1pt}
+\setlist[itemize]{topsep=1pt,itemsep=0pt,parsep=0pt,leftmargin=*}
+\setlength{\parskip}{2pt}
+\setlength{\parindent}{0pt}
+\pagestyle{empty}
+
+\begin{document}
+
+% ------------------------------------------------------------------ title page
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\large National University of Singapore \\ School of Computing \par}
+\vspace{0.4cm}
+{\large CS4246/5446 --- Reinforcement Learning and Sequential Decision Making \\
+Semester 1, AY2026/27 \par}
+\vspace{1.6cm}
+{\LARGE\bfseries Project Proposal \par}
+\vspace{0.6cm}
+{\Large Learning When \emph{Not} to Trade: Reinforcement Learning for \\[2pt]
+Cross-Venue Latency Arbitrage After Transaction Costs \par}
+\vspace{1.6cm}
+{\large Group X \quad\textbar\quad Application Project \par}
+\vspace{1.4cm}
+
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Name} & \textbf{Matriculation No.} & \textbf{Email} \\
+\midrule
+Kerk Tai Heng      & A0XXXXXXX & e1137106@u.nus.edu \\
+$\langle$Member 2$\rangle$ & A0XXXXXXX & eXXXXXXX@u.nus.edu \\
+$\langle$Member 3$\rangle$ & A0XXXXXXX & eXXXXXXX@u.nus.edu \\
+$\langle$Member 4$\rangle$ & A0XXXXXXX & eXXXXXXX@u.nus.edu \\
+$\langle$Member 5$\rangle$ & A0XXXXXXX & eXXXXXXX@u.nus.edu \\
+$\langle$Member 6$\rangle$ & A0XXXXXXX & eXXXXXXX@u.nus.edu \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.8cm}
+{\small\textit{AI-use disclosure: ChatGPT was used to edit the team's draft for clarity
+and concision. The project idea, data, plan, and decisions are the team's work, and the
+team remains responsible for the final submission.}\par}
+
+\vfill
+{\normalsize Submitted 28 September 2026 \par}
+\end{titlepage}
+
+% ------------------------------------------------------------------- body (1p)
+\textbf{1. Background and problem.}
+Bitcoin perpetual futures trade on both Binance and Hyperliquid, but the two venues do not
+incorporate new information at exactly the same time. Binance often moves first, while
+Hyperliquid's public order book follows after its next updates; in our recordings, the
+slower book has a median information age of about 285\,ms. During this brief window, a move
+on Binance can indicate the direction in which Hyperliquid may next move. Latency arbitrage
+attempts to trade before that adjustment and exit when the two prices converge.
+
+The visible price gap is not the same as a tradable profit. Its median size is about
+1 basis point, while an immediate round trip can cost roughly 7 basis points after taker
+fees and the bid--ask spread~\cite{report}. Fees are paid on entry and exit; crossing the
+spread means buying at the ask and selling at the bid; execution delay and slippage can
+consume more of the remaining edge. A fixed rule that trades whenever the gap exceeds a
+threshold therefore loses money after costs. Our question is whether reinforcement
+learning (RL) can learn to trade only the unusually strong opportunities and otherwise
+remain inactive.
+
+\textbf{2. Data and cost-aware environment.}
+We will use roughly 26 million time-aligned, ten-level order-book snapshots collected from
+both venues over 30 days. Later days will be reserved for validation and testing so that
+the agent never trains on future market conditions. Contiguous periods will be replayed in
+a Gymnasium environment~\cite{gym}.
+
+The agent's observation will summarise the cross-venue price gap, each venue's bid--ask
+spread, order-book imbalance, short-term volatility, the age of the slower quote, current
+inventory, and holding time. Its actions are to stay flat, enter long, enter short, or exit.
+The reward is portfolio profit and loss after taker fees, spread and slippage, funding, and
+a conservative 150\,ms execution delay. This prevents the agent from treating a visible but
+unexecutable price difference as profit.
+
+\textbf{3. RL approach and evaluation.}
+We will first implement the fixed-threshold strategy inside the same environment. PPO will
+be the main RL method~\cite{ppo}; its conservative policy updates are suitable for noisy
+observations and delayed rewards. We will normalise observations and tune reward scaling so
+that rare profitable trades are not overwhelmed by the much more common ``do nothing''
+steps. If time permits, DQN~\cite{dqn} will provide a value-based comparison for the same
+discrete actions.
+
+The baseline and RL agents will be compared on later, unseen days using net return,
+drawdown, win rate, number of trades, and trade selectivity. We will repeat the evaluation
+with fee assumptions from 0.5 to 3.5 basis points per side and with less favourable spread
+and delay assumptions. Success means improving on the fixed rule after identical costs,
+not proving guaranteed profitability. A careful estimate of the fee level at which the
+edge disappears is also a valid result.
+
+\textbf{4. Scope and deliverables.}
+To keep the project feasible, we will study one perpetual-futures market pair and evaluate
+only on recorded data. The deliverables are a checked dataset, a replay environment, a
+reproducible baseline, an RL policy, and a comparison on held-out periods. Live trading,
+multiple assets, and a production execution system are outside the project scope.
+
+\textbf{5. Responsible AI.}
+All experiments will be offline and use no live capital. Position and loss limits will be
+part of the environment rather than left to the learned policy. We will document data gaps,
+cost assumptions, and failed experiments; log the agent's trades and abstentions; and
+discuss whether the strategy could disadvantage slower market participants. These measures
+support accountability, transparency, and realistic interpretation of the results.
+
+\textbf{6. Division of work.}
+\emph{Kerk Tai Heng} --- data preparation and episode generation.
+\emph{Member 2} --- replay environment and transaction-cost model.
+\emph{Member 3} --- baseline strategy and evaluation tools.
+\emph{Member 4} --- PPO training and tuning.
+\emph{Member 5} --- held-out evaluation and fee sensitivity tests.
+\emph{Member 6} --- Responsible-AI analysis, report integration, and presentation.
+All members will review the full pipeline and share testing, writing, and presentation work.
+
+\textbf{7. Milestones and fallback outcomes.}
+\textbf{5 Oct:} clean the data, describe the observed price differences, and produce replay
+episodes. This can stand alone as a measurement study.
+\textbf{19 Oct:} complete the environment, cost model, and baseline. This can stand alone as
+a realistic benchmark study.
+\textbf{2 Nov:} train the PPO agent and compare it with the baseline on validation data.
+This is the minimum complete RL result.
+\textbf{9 Nov:} finish held-out evaluation, fee sensitivity tests, Responsible-AI analysis,
+and presentation materials. The final report is due 15 Nov.
+
+\textbf{8. Risk assessment.}
+\emph{No usable edge after costs} (high): present this as a negative result and estimate the
+cost level at which trading becomes unviable.
+\emph{RL training is unstable or learns only to abstain} (medium): simplify the state and
+reward, compare with a value-based agent, and retain the baseline study as a complete
+fallback.
+\emph{Results overfit one market period} (medium): use chronological splits, keep the test
+period untouched until final evaluation, and report variation across days.
+\emph{Simulated fills are too optimistic} (high): use conservative fees, spread, and delay,
+then repeat the evaluation under worse assumptions.
+\emph{Missing or poor-quality data} (low): exclude affected periods using pre-defined checks
+and document the remaining coverage.
+
+% ------------------------------------------------------------------- refs
+\newpage
+\begin{thebibliography}{9}\small
+\bibitem{report} Cross-venue latency arbitrage feasibility study, Binance--Hyperliquid BTC perpetuals, 2026. Internal report supplied to the team.
+\bibitem{ppo} Schulman J, Wolski F, Dhariwal P, Radford A, Klimov O. Proximal policy optimization algorithms. arXiv:1707.06347. 2017.
+\bibitem{dqn} Mnih V, Kavukcuoglu K, Silver D, et al. Human-level control through deep reinforcement learning. Nature. 2015;518(7540):529--33.
+\bibitem{gym} Towers M, Terry JK, Kwiatkowski A, et al. Gymnasium: a standard interface for reinforcement learning environments. arXiv:2407.17032. 2024.
+\end{thebibliography}
+
+\end{document}
